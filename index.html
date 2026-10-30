@@ -352,15 +352,46 @@
       }
     }
   };
+    };
   Module.setStatus('Downloading...');
-  window.onerror = function (event) {
-    Module.setStatus('Exception thrown, see JavaScript console');
-    spinnerElement.style.display = 'none';
+  
+  // Updated error handler to show the actual JavaScript console output
+  window.onerror = function (message, source, lineno, colno, error) {
+    // Format a clean, descriptive error string
+    var errorMsg = 'Exception thrown: ' + message;
+    if (source) {
+      var fileName = source.split('/').pop(); // Gets just the file name instead of the whole URL
+      errorMsg += ' (at ' + fileName + ':' + lineno + ')';
+    }
+
+    // Display the actual error message directly in your UI status element
+    if (typeof statusElement !== 'undefined') {
+      statusElement.innerHTML = '<span style="color: #ff4d4d;">' + errorMsg + '</span>';
+    } else {
+      Module.setStatus(errorMsg);
+    }
+    
+    // Hide the spinner since execution has stopped
+    if (typeof spinnerElement !== 'undefined') {
+      spinnerElement.style.display = 'none';
+    }
+    
+    // Also print the full stack trace to your custom HTML console if it exists
+    if (error && error.stack) {
+      Module.printErr(error.stack);
+    } else {
+      Module.printErr(errorMsg);
+    }
+
     Module.setStatus = function (text) {
       if (text) Module.printErr('[post-exception status] ' + text);
     };
+    
+    // Return false so the browser still logs it natively to the dev tools console
+    return false; 
   };
 </script>
 <script async type="text/javascript" src="d3wasm.js"></script>
 </body>
+</html>
 </html>
