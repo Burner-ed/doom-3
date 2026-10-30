@@ -306,14 +306,82 @@
     }
   };
   Module.setStatus('Downloading...');
-  window.onerror = function (event) {
-    // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
-    Module.setStatus('Exception thrown, see JavaScript console');
-    spinnerElement.style.display = 'none';
-    Module.setStatus = function (text) {
-      if (text) Module.printErr('[post-exception status] ' + text);
-    };
+  // ============================================================================
+  // ON-SCREEN FLOATING CONSOLE OVERLAY (Bypasses Inspect Restrictions)
+  // ============================================================================
+  var debugConsole = document.createElement('div');
+  debugConsole.id = 'on-screen-debug-console';
+  debugConsole.style.position = 'fixed';
+  debugConsole.style.bottom = '10px';
+  debugConsole.style.right = '10px';
+  debugConsole.style.width = '450px';
+  debugConsole.style.height = '300px';
+  debugConsole.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+  debugConsole.style.color = '#00ff00';
+  debugConsole.style.fontFamily = 'monospace';
+  debugConsole.style.fontSize = '12px';
+  debugConsole.style.padding = '10px';
+  debugConsole.style.overflowY = 'scroll';
+  debugConsole.style.zIndex = '999999';
+  debugConsole.style.border = '2px solid #ff4d4d';
+  debugConsole.style.borderRadius = '5px';
+  debugConsole.innerHTML = '<div style="color:#ffcc00; font-weight:bold; border-bottom:1px solid #555; padding-bottom:4px; margin-bottom:6px;">On-Screen Debug Console</div>';
+  document.body.appendChild(debugConsole);
+
+  function logToScreen(msg, color) {
+    var line = document.createElement('div');
+    line.style.marginBottom = '4px';
+    line.style.whiteSpace = 'pre-wrap';
+    line.style.wordBreak = 'break-all';
+    if (color) line.style.color = color;
+    line.textContent = msg;
+    debugConsole.appendChild(line);
+    debugConsole.scrollTop = debugConsole.scrollHeight;
+  }
+
+  // Intercept standard console errors and logs
+  var originalLog = console.log;
+  var originalError = console.error;
+  console.log = function() {
+    originalLog.apply(console, arguments);
+    logToScreen(Array.prototype.slice.call(arguments).join(' '), '#ffffff');
   };
+  console.error = function() {
+    originalError.apply(console, arguments);
+    logToScreen(Array.prototype.slice.call(arguments).join(' '), '#ff4d4d');
+  };
+
+  Module.setStatus('Downloading...');
+
+  // Catch unhandled exceptions and display their exact message and stack trace
+  window.onerror = function (message, source, lineno, colno, error) {
+    var errorMsg = '🛑 [Exception]: ' + message;
+    if (source) {
+      var fileName = source.split('/').pop();
+      errorMsg += ' \n   at ' + fileName + ':' + lineno + ':' + colno;
+    }
+    
+    logToScreen(errorMsg, '#ff4d4d');
+    
+    if (error && error.stack) {
+      logToScreen('📋 [Stack Trace]:\n' + error.stack, '#ffcc00');
+    }
+
+    // Try to update standard UI elements safely if they exist
+    if (typeof statusElement !== 'undefined') statusElement.innerHTML = message;
+    if (typeof spinnerElement !== 'undefined') spinnerElement.style.display = 'none';
+
+    Module.setStatus = function (text) {
+      if (text) logToScreen('[post-exception status] ' + text, '#888888');
+    };
+    return false;
+  };
+
+  // Catch WebAssembly/Promise rejections
+  window.addEventListener('unhandledrejection', function(event) {
+    logToScreen('🛑 [Unhandled Promise Rejection]: ' + event.reason, '#ff4d4d');
+  });
+  // ============================================================================
 </script>
 <script async type="text/javascript" src="d3wasm.js"></script>
 </body>
